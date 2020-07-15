@@ -2,6 +2,7 @@ const BitMEXClient = require('bitmex-realtime-api');
 const amqp = require('amqplib');
 const express = require('express');
 const url = require('url');
+const registerSwaggerUi = require('./../helpers').registerSwaggerUi;
 
 const e = 'tickPublisher';
 
@@ -21,11 +22,11 @@ async function publish() {
       timestamp: tick.timestamp,
       side: tick.side,
       price: tick.price,
-      tickDirection: tick.tickDirection,
+      direction: tick.tickDirection,
       trdMatchID: tick.trdMatchID,
       grossValue: tick.grossValue,
-      homeNotional: tick.homeNotional,
-      foreignNotional: tick.foreignNotional
+	  homeNotional: tick.homeNotional,
+	  foreignNotional: tick.foreignNotional
     };
     ch.publish(e, '', Buffer.from(JSON.stringify(tick)));
   });
@@ -34,8 +35,8 @@ async function publish() {
 function startServer() {
   const app = express();
   app.listen(5001);
-  app.route('/get').get(function(req, res) {
-    let urlQuery = url.parse(req.url, true).query;
+  app.route('/v1/tick').get(function(req, res) {
+	let urlQuery = url.parse(req.url, true).query;
     let symbol = urlQuery.symbol;
     if (symbol === undefined) {
       res.send('Please specify a symbol.');
@@ -45,16 +46,21 @@ function startServer() {
     const record = cachedPrice[symbol];
 
     if (record === undefined) {
-      res.send('The symbol ' + symbol + ' does not exist.');
+      res.status(400).send('The symbol ' + symbol + ' does not exist.');
       return;
     }
 
     res.send(record);
   });
-  app.route('/symbols/list').get(function(req, res) {
+  app.route('/v1/symbols/list').get(function(req, res) {
 	const symbols = Object.keys(cachedPrice);
-	res.send(symbols);
+	res.send(symbols.filter(s => s.indexOf('.') === -1));
   });
+  registerSwaggerUi(
+    './tick_publisher/tick_publisher.yml',
+	'http://localhost:5001/v1',
+	app
+  );
 }
 
 publish();

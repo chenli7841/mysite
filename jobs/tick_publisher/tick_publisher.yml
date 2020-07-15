@@ -1,0 +1,63 @@
+openapi: 3.0.0
+info:
+  description: |
+    APIs for tick publisher
+  version: "1.0.0"
+  title: Tick Publisher
+  termsOfService: 'http://swagger.io/terms/'
+  contact:
+    email: li.chen7841@gmail.com
+  license:
+    name: Apache 2.0
+    url: 'http://www.apache.org/licenses/LICENSE-2.0.html'
+paths:
+  /tick:
+    get:
+      summary: Get the latest tick
+      operationId: getTick
+      parameters:
+        - name: symbol
+          in: query
+          schema:
+            type: string
+      responses:
+        '400':
+          description: Invalid symbol supplied
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Tick'
+  /symbols/list:
+    get:
+      summary: List all symbols
+      operationId: listSymbols
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                type: string
+components:
+  schemas:
+    Tick:
+      type: object
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+        side:
+          type: string
+          enum:
+            - Buy
+            - Sell
+        price:
+          type: number
+        direction:
+          type: string
+        trdMatchID:
+          type: string
+        grossValue:
+          type: number
