@@ -30,7 +30,7 @@ if (new Date().getUTCHours() === 23) {
   templateTable.copy(dataset.table(NextDayString(now))).then(() => {
     nextTable = dataset.table(NextDayString(now));
   }).catch((e) => {
-	console.log('Initially create next table failed', NextDayString(now), e);
+    console.log('Initially create next table failed', NextDayString(now), e);
     setTimeout(() => {
       nextTable = dataset.table(NextDayString(now));
     }, 5000);
@@ -61,7 +61,7 @@ function subscribe() {
       s: symbol,
       localTime: new Date()
     };
-  
+
     if (!lastRecord) {
       // initialization
       lastRecord = record;
@@ -98,7 +98,7 @@ function subscribe() {
         };
         currentTable.insert(toInsert, { raw: true });  
       }
-      
+
       lastRecord = record;
       return;
     }
@@ -114,7 +114,7 @@ function subscribe() {
         currentTable.insert(toInsert, { raw: true });
       }
       currentTable = nextTable;
-	  nextTable = undefined;
+      nextTable = undefined;
       for (; i < currRecordInSeconds; i = AddOneSecond(i)) {
         const toInsert = {
           insertId: AddOneSecond(i).toISOString(),
@@ -122,6 +122,8 @@ function subscribe() {
         };
         currentTable.insert(toInsert, { raw: true });
       }
+      lastRecord = record;
+      return;
     }
   });
 }
