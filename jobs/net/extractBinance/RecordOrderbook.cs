@@ -12,6 +12,7 @@ namespace extractBinance
     public class RecordOrderbook
     {
         int? currentDay = null;
+        int lastSecond = -1;
         readonly BinanceSocketClient socketClient;
         readonly BigQueryClient bqClient;
         readonly BinanceClient binanceClient;
@@ -51,7 +52,9 @@ namespace extractBinance
             DateTime? time = null;
             if (data.EventTime.HasValue)
             {
-                time = getTime(data.EventTime.Value);
+                time = data.EventTime.Value.Second == lastSecond ?
+                    data.EventTime.Value : getTime(data.EventTime.Value);
+                lastSecond = data.EventTime.Value.Second;
             }
             
             BigQueryInsertRow row = new BigQueryInsertRow(insertId: time == null ? null : time.ToString())
