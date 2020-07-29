@@ -1,7 +1,10 @@
 package extractHuobiOrderbook;
 
+import com.google.common.collect.ImmutableMap;
 import com.google.gson.Gson;
 import com.google.gson.JsonSyntaxException;
+import org.joda.time.DateTime;
+import org.joda.time.DateTimeZone;
 
 import javax.websocket.*;
 import java.io.BufferedReader;
@@ -10,6 +13,8 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
+import java.util.Map;
+import java.util.function.Consumer;
 import java.util.zip.GZIPInputStream;
 
 @ClientEndpoint
@@ -28,7 +33,18 @@ public class HuobiClientEndpoint {
     }
 
     private static class Orderbook extends DataFrame {
+
+        private long ts;
+
         private Tick tick;
+
+        public long getTs() {
+            return ts;
+        }
+
+        public void setTs(long ts) {
+            this.ts = ts;
+        }
 
         public Tick getTick() {
             return tick;
@@ -60,11 +76,52 @@ public class HuobiClientEndpoint {
         }
     }
 
-    Gson gson = new Gson();
+    private static class OrderbookMapper {
+        public Map<String, ?> map(final Orderbook orderbook, final String symbol, final String base, final String target) {
+            return Map.of(
+                    "t", new DateTime().withMillis(orderbook.ts).withZone(DateTimeZone.UTC).toString(),
+                    "ask", orderbook.tick.asks[0][0],
+                    "bid", orderbook.tick.bids[0][0],
+                    "base", base,
+                    "target", target,
+                    "s", symbol,
+                    "localTime", DateTime.now(DateTimeZone.UTC).toString()
+            );
+        }
+    }
+
+    private static class SymbolInfo {
+        public String base;
+        public String target;
+        public String channel;
+
+        public SymbolInfo(String base, String target, String channel) {
+            this.base = base;
+            this.target = target;
+            this.channel = channel;
+        }
+    }
+
+    private Gson gson = new Gson();
+
+    private OrderbookMapper mapper = new OrderbookMapper();
+
+    private static Map<String, SymbolInfo> SYMBOL_INFO = ImmutableMap.of(
+            "BTCUSDT", new SymbolInfo("USDT", "BTC", "market.btcusdt.depth.step0")
+    );
+
+    private String symbol;
+    private Consumer<Map<String, ?>> onOrderbook;
+
+    public HuobiClientEndpoint(final String symbol, final Consumer<Map<String, ?>> onOrderbook) {
+        this.symbol = symbol;
+        this.onOrderbook = onOrderbook;
+    }
 
     @OnOpen
     public void onOpen(final Session session) throws IOException {
-        final String req = "{\"sub\": \"market.btcusdt.depth.step0\", \"id\": \"id1\"}";
+        final String channel = SYMBOL_INFO.get(symbol).channel;
+        final String req = "{\"sub\": \"" + channel + "\", \"id\": \"id1\"}";
         System.out.println("sent req on open");
         session.getBasicRemote().sendText(req);
     }
@@ -82,11 +139,14 @@ public class HuobiClientEndpoint {
         br.close();
         gis.close();
         bis.close();
-        System.out.println(sb.toString());
         try {
             Orderbook ob = gson.fromJson(sb.toString(), Orderbook.class);
             if (ob.getTick() != null) {
-                System.out.println(ob.getTick().getAsks()[0][0]);
+                final SymbolInfo symbol_info = SYMBOL_INFO.get(symbol);
+                final Map<String, ?> record = mapper.map(ob, symbol, symbol_info.base, symbol_info.target);
+                if (onOrderbook != null) {
+                    onOrderbook.accept(record);
+                }
             } else if (ob.getPing() != null) {
                 String pong = "{\"pong\":" + ob.getPing() + "}";
                 session.getBasicRemote().sendText(pong);
@@ -97,20 +157,6 @@ public class HuobiClientEndpoint {
             System.out.println("Json parse exception");
             System.out.println(ex.getMessage());
         }
-        /*
-        try {
-            PingMessage ping = gson.fromJson(sb.toString(), PingMessage.class);
-            System.out.println(ping.getPing());
-        } catch (JsonSyntaxException ex) {
-            System.out.println("Json parse exception");
-            System.out.println(ex.getMessage());
-        }
-         */
-    }
-
-    @OnMessage
-    public void pongMessage(Session session, PongMessage msg) {
-        System.out.println("pong message " + msg.toString());
     }
 
     @OnError
