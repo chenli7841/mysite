@@ -30,6 +30,7 @@ dependencies {
     implementation 'com.google.code.gson:gson:2.8.6'
     implementation 'com.google.cloud:google-cloud-bigquery:1.116.7'
     implementation 'joda-time:joda-time:2.10.6'
+    implementation 'org.java-websocket:Java-WebSocket:1.5.1'
 }
 
 // Define the main class for the application
