@@ -1,0 +1,7 @@
+name: crypto
+dependencies:
+  - python >= 3.5
+  - pip
+  - pip:
+    - websocket_client
+    - google-cloud-bigquery
