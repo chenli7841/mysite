@@ -5,15 +5,12 @@ import com.google.gson.JsonSyntaxException;
 import org.java_websocket.client.WebSocketClient;
 import org.java_websocket.handshake.ServerHandshake;
 import org.joda.time.DateTime;
-import org.joda.time.DateTimeZone;
 
 import java.io.BufferedReader;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
-import java.math.BigDecimal;
 import java.net.URI;
-import java.net.URISyntaxException;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
@@ -30,11 +27,11 @@ public class HuobiClient extends WebSocketClient {
 
     private String symbol;
 
-    private Consumer<Map<String, ?>> onOrderbook;
+    private Consumer<Map<String, String>> onOrderbook;
 
     private Consumer<Object> onDisconnect;
 
-    public HuobiClient(URI serverUri, String symbol, Consumer<Map<String, ?>> onOrderbook, Consumer onDisconnect) {
+    public HuobiClient(URI serverUri, String symbol, Consumer<Map<String, String>> onOrderbook, Consumer onDisconnect) {
         super(serverUri);
         this.symbol = symbol;
         this.onOrderbook = onOrderbook;
@@ -100,7 +97,7 @@ public class HuobiClient extends WebSocketClient {
             Orderbook ob = gson.fromJson(sb.toString(), Orderbook.class);
             if (ob.getTick() != null) {
                 final SymbolInfo symbol_info = SYMBOL_INFO.get(symbol);
-                final Map<String, ?> record = mapper.map(ob, symbol, symbol_info.base, symbol_info.target);
+                final Map<String, String> record = mapper.map(ob, symbol, symbol_info.base, symbol_info.target);
                 if (onOrderbook != null) {
                     onOrderbook.accept(record);
                 }

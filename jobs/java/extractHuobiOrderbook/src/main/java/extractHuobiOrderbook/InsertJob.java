@@ -9,14 +9,14 @@ import org.joda.time.DateTimeZone;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 public class InsertJob {
 
     private final BigQuery bigQuery;
-    private int currentDay;
-    private int lastSecond;
+    private Map<String, String> lastRecord;
     private final Table templateTable;
     private static String DATASET_ID = "huobi_orderbooks";
     private static String TEMPLATE_TABLE_ID = "template";
@@ -31,29 +31,49 @@ public class InsertJob {
         templateTable = bigQuery.getTable(DATASET_ID, TEMPLATE_TABLE_ID);
         final DateTime today = DateTime.now(DateTimeZone.UTC);
         setupTable(today);
-        currentDay = today.getDayOfMonth();
-        lastSecond = -1;
     }
 
-    public void insertRow(final Map<String, ?> orderbookRecord) {
-        final DateTime dateTime = new DateTime(orderbookRecord.get("t")).withZone(DateTimeZone.UTC);
-
-        if (currentDay != dateTime.getDayOfMonth()) {
-            setupTable(dateTime);
+    public void insertRow(final Map<String, String> orderbookRecord) {
+        if (lastRecord == null) {
+            lastRecord = orderbookRecord;
+            return;
         }
+        final DateTime currTime = new DateTime(orderbookRecord.get("t")).withZone(DateTimeZone.UTC);
+        final DateTime prevTime = new DateTime(lastRecord.get("t")).withZone(DateTimeZone.UTC);
+        if (!prevTime.isBefore(currTime)) {
+            return;
+        } else if (prevTime.getSecondOfDay() == currTime.getSecondOfDay()) {
+            lastRecord = orderbookRecord;
+            return;
+        } else if (prevTime.getDayOfYear() == currTime.getDayOfYear()) {
+            final DateTime until = truncateToSecond(currTime);
+            for (DateTime currSecond = truncateToSecond(prevTime); currSecond.isBefore(until); currSecond = addOneSecond(currSecond)) {
+                insertToBigQuery(currSecond, lastRecord);
+            }
+            lastRecord = orderbookRecord;
+        } else {
+            final DateTime until = truncateToSecond(currTime);
+            DateTime currSecond = truncateToSecond(prevTime);
+            setupTable(currTime);
+            for (; currSecond.isBefore(until); currSecond = addOneSecond(currSecond)) {
+                insertToBigQuery(currSecond, lastRecord);
+            }
+            lastRecord = orderbookRecord;
+        }
+    }
 
-        final String rowId = dateTime.getSecondOfMinute() == lastSecond ?
-                dateTime.toString() :
-                dateTime.withMillisOfSecond(0).toString();
-        InsertAllResponse response = bigQuery.insertAll(InsertAllRequest.newBuilder(DATASET_ID, getTableName(dateTime))
-                .addRow(rowId, orderbookRecord).build());
+    private void insertToBigQuery(final DateTime currSecond, final Map<String, String> record) {
+        Map<String, String> toInsert = new HashMap<>(record);
+        toInsert.put("t", addOneSecond(currSecond).toString());
+        toInsert.put("localTime", DateTime.now().toString());
+        final String rowId = currSecond.toString();
+        InsertAllResponse response = bigQuery.insertAll(InsertAllRequest.newBuilder(DATASET_ID, getTableName(addOneSecond(currSecond)))
+                .addRow(rowId, toInsert).build());
         if (response.hasErrors()) {
             for (Map.Entry<Long, List<BigQueryError>> entry : response.getInsertErrors().entrySet()) {
                 System.out.println("Response error: \n" + entry.getValue());
             }
         }
-        lastSecond = dateTime.getSecondOfMinute();
-        currentDay = dateTime.getDayOfMonth();
     }
 
     private void setupTable(final DateTime dateTime) {
@@ -62,5 +82,13 @@ public class InsertJob {
 
     private String getTableName(final DateTime dateTime) {
         return String.format("%d_%d_%d", dateTime.getYear(), dateTime.getMonthOfYear(), dateTime.getDayOfMonth());
+    }
+
+    private DateTime truncateToSecond(final DateTime dateTime) {
+        return dateTime.withMillisOfSecond(0);
+    }
+
+    private DateTime addOneSecond(final DateTime dateTime) {
+        return dateTime.plusSeconds(1);
     }
 }
