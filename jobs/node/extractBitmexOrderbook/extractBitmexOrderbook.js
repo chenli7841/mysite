@@ -1,9 +1,14 @@
+const SYMBOL_INFO = {
+	'BTCUSDT': { base: 'USDT', target: 'BTC', bitMexSymbol: 'XBTUSD' }
+}
+
 const args = process.argv.slice(2);
-if (args.length != 3) {
-  console.log('Please provide 3 arguments: BitMex symbol, universal base, universal target. Such as node extractBitmexOrderbook/extractBitmexOrderbook.js XBTUSD USDT BTC.');
+if (args.length != 1) {
+  console.log('Please special a symbol. Such as node extractBitmexOrderbook/extractBitmexOrderbook.js BTCUSDT.');
   process.exit(1);
 }
-const [bitMexSymbol, base, target] = args;
+const inputSymbol = args[0];
+const {base, target, bitMexSymbol} = SYMBOL_INFO[inputSymbol];
 
 const BitMEXClient = require('bitmex-realtime-api');
 const {BigQuery} = require('@google-cloud/bigquery');
@@ -58,7 +63,7 @@ function subscribe() {
       ask: asks[0][0],
       base: base,
       target: target,
-      s: symbol,
+      s: inputSymbol,
       localTime: new Date()
     };
 
