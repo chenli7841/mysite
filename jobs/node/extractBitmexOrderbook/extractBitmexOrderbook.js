@@ -106,7 +106,7 @@ function subscribe() {
     if (lastRecordInSeconds.getDate() !== currRecordInSeconds.getDate()) {
       // Assume no whole-day gap
       let i = lastRecordInSeconds;
-      for (; IsDayEnd(i); i = AddOneSecond(i)) {
+      for (; !IsDayEnd(i); i = AddOneSecond(i)) {
         const toInsert = {
           insertId: AddOneSecond(i).toISOString(),
           json: {...record, t: AddOneSecond(i)}
