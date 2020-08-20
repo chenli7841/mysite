@@ -43,7 +43,7 @@ namespace extractBinance
         {
             setupTable(DateTime.UtcNow);
             
-            socketClient.SubscribeToOrderBookUpdates(this.symbol, 1000, (data) => 
+            var conn = socketClient.SubscribeToOrderBookUpdates(this.symbol, 1000, (data) => 
             {
                 DateTime now = DateTime.UtcNow;
                 insertRow(data);
@@ -59,32 +59,40 @@ namespace extractBinance
             }
             DateTime currTime = data.EventTime.Value.ToUniversalTime();
             DateTime prevTime = lastRecord.EventTime.Value.ToUniversalTime();
+            DateTime currSecond = truncateToSecond(currTime);
+            DateTime prevSecond = truncateToSecond(prevTime);
             if (lastRecord.EventTime.Value > data.EventTime.Value)
             {
                 return;
             }
-            else if (prevTime.Second == currTime.Second)
+            else if (prevSecond == currSecond)
             {
                 lastRecord = data;
                 return;
             }
             else if (prevTime.Day == currTime.Day)
             {
-                DateTime until = truncateToSecond(currTime);
-                for (DateTime currSecond = truncateToSecond(prevTime); currSecond < until; currSecond = addOneSecond(currSecond))
+                for (DateTime s = prevSecond; s < currSecond; s = addOneSecond(s))
                 {
-                    insertToBigQuery(currSecond, lastRecord);
+                    try
+                    {
+                        insertToBigQuery(s, lastRecord);
+                    }
+                    catch (Exception e)
+                    {
+                        Console.WriteLine(e.ToString());
+                    }
                 }
+                Console.WriteLine("Prev Day: " + prevTime + ", Curr Day: " + currTime);
                 lastRecord = data;
                 return;
             }
             else
             {
-                DateTime until = truncateToSecond(currTime);
                 setupTable(currTime);
-                for (DateTime currSecond = truncateToSecond(prevTime); currSecond < until; currSecond = addOneSecond(currSecond))
+                for (DateTime s = prevSecond; s < currSecond; s = addOneSecond(s))
                 {
-                    insertToBigQuery(currSecond, lastRecord);
+                    insertToBigQuery(s, lastRecord);
                 }
                 lastRecord = data;
                 return;
